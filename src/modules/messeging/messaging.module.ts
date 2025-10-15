@@ -6,7 +6,6 @@ import { ConversationService, MessageService, MessagingService } from './service
 import { MessagingController } from './messaging.controller';
 import { MessagingGateway } from './messaging.gateway';
 import { QueueModule } from '../queue/queue.module';
-import { CryptoService } from '../../common/utils/crypto.service';
 
 @Module({
   imports: [
@@ -15,23 +14,17 @@ import { CryptoService } from '../../common/utils/crypto.service';
   ],
   controllers: [MessagingController],
   providers: [
-    {
-      provide: 'MASTER_ENCRYPTION_SECRET',
-      useValue: process.env.MASTER_ENCRYPTION_SECRET || '',
-    },
     ConversationService,
     MessageService,
     MessagingService,
-    MessagingGateway,
-    CryptoService
+    MessagingGateway
   ],
   exports: [
     ConversationService,
     MessageService,
     MessagingService,
     TypeOrmModule,
-    MessagingGateway,
-    CryptoService
+    MessagingGateway
   ]
 })
 export class MessagingModule {}

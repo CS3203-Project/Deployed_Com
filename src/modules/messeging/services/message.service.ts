@@ -5,7 +5,6 @@ import { randomUUID } from 'crypto';
 import { Message } from '../entities/message.entity';
 import { QueueService } from '../../queue/queue.service';
 import { MessagingGateway } from '../messaging.gateway';
-import { CryptoService } from '../../../common/utils/crypto.service';
 import {
   CreateMessageDto,
   GetMessagesDto,
@@ -15,18 +14,13 @@ import {
 
 @Injectable()
 export class MessageService {
-  private encryptionEnabled: boolean;
-
   constructor(
     @InjectRepository(Message)
     private messageRepository: Repository<Message>,
     private queueService: QueueService,
     @Inject(forwardRef(() => MessagingGateway))
     private messagingGateway: MessagingGateway,
-    private cryptoService: CryptoService,
-  ) {
-    this.encryptionEnabled = process.env.MESSAGING_ENCRYPTION_ENABLED === 'true';
-  }
+  ) {}
 
   /**
    * Send a new message
@@ -34,36 +28,23 @@ export class MessageService {
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponseDto> {
     const { content, fromId, toId, conversationId, senderName, senderEmail, recipientName, recipientEmail } = createMessageDto;
 
-    // Encrypt content if encryption is enabled
-    let processedContent = content;
-    if (this.encryptionEnabled) {
-      try {
-        processedContent = this.cryptoService.encrypt(content);
-      } catch (error) {
-        throw new Error(`Failed to encrypt message: ${error.message}`);
-      }
-    }
-
     // Create new message
     const message = new Message();
     message.id = randomUUID();
-    message.content = processedContent;
+    message.content = content;
     message.fromId = fromId;
     message.toId = toId;
     message.conversationId = conversationId;
 
     const savedMessage = await this.messageRepository.save(message);
-
-    // Prepare decrypted content for email notification (only for backward compatibility)
-    const emailContent = content; // Use original content for email notifications
-
+    
     // SMART EMAIL NOTIFICATION: Check if message is read after 5 seconds
     try {
       // Check if we have real user data for email notifications
       if (senderEmail && recipientEmail && senderName && recipientName) {
         console.log(`📧 Message sent - Starting 5 second timer to check if read`);
         console.log(`🕐 Will check if message ${savedMessage.id} is read by ${recipientName} (${toId}) in 5 seconds`);
-
+        
         // Schedule email notification check after 5 seconds
         setTimeout(async () => {
           try {
@@ -71,41 +52,41 @@ export class MessageService {
             const updatedMessage = await this.messageRepository.findOne({
               where: { id: savedMessage.id }
             });
-
+            
             if (!updatedMessage) {
               console.log(`❌ Message ${savedMessage.id} not found during email check`);
               return;
             }
-
+            
             // Check if message has been read (receivedAt is not null)
             if (updatedMessage.receivedAt) {
               console.log(`✅ Message ${savedMessage.id} was READ by ${recipientName} - Skipping email notification`);
               console.log(`📖 Message was read at: ${updatedMessage.receivedAt.toISOString()}`);
             } else {
               console.log(`📧 Message ${savedMessage.id} is still UNREAD after 5 seconds - Sending email notification`);
-
+              
               await this.queueService.sendMessageNotification({
                 senderEmail: senderEmail,
                 recipientEmail: recipientEmail,
                 senderName: senderName,
                 recipientName: recipientName,
                 conversationId: conversationId,
-                messageContent: emailContent.length > 100 ? emailContent.substring(0, 100) + '...' : emailContent
+                messageContent: content.length > 100 ? content.substring(0, 100) + '...' : content
               });
-
+              
               console.log(`✅ Email notification queued for unread message to ${recipientEmail}`);
             }
           } catch (delayedEmailError) {
             console.error('❌ Error during delayed email notification check:', delayedEmailError);
           }
         }, 5000); // 5 seconds delay
-
+        
         console.log(`⏰ Email notification check scheduled for 5 seconds from now`);
       } else {
         console.log('📧 Message email notification skipped - missing user data');
         console.log('📝 Missing fields:', {
           senderEmail: !senderEmail ? 'missing' : 'provided',
-          recipientEmail: !recipientEmail ? 'missing' : 'provided',
+          recipientEmail: !recipientEmail ? 'missing' : 'provided', 
           senderName: !senderName ? 'missing' : 'provided',
           recipientName: !recipientName ? 'missing' : 'provided'
         });
@@ -296,33 +277,12 @@ export class MessageService {
   }
 
   /**
-   * Decrypt content if encrypted, otherwise return as-is
-   */
-  private decryptContent(content: string): string {
-    if (!this.encryptionEnabled) {
-      return content;
-    }
-
-    try {
-      if (this.cryptoService.isEncrypted(content)) {
-        return this.cryptoService.decrypt(content);
-      }
-      return content; // Already plain text
-    } catch (error) {
-      // Decryption failed - throw error as requested
-      throw new Error(`Failed to decrypt message: ${error.message}`);
-    }
-  }
-
-  /**
    * Map message entity to DTO
    */
   mapMessageToDto(message: Message): MessageResponseDto {
-    const decryptedContent = this.decryptContent(message.content);
-
     return {
       id: message.id,
-      content: decryptedContent,
+      content: message.content,
       fromId: message.fromId,
       toId: message.toId,
       conversationId: message.conversationId,
