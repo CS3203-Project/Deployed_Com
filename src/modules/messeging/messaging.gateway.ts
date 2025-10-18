@@ -14,7 +14,21 @@ import { CreateMessageDto } from './dto';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allowlist of origins - can be set via FRONTEND_URLS env var (comma-separated)
+      const allowedOrigins = process.env.FRONTEND_URLS
+        ? process.env.FRONTEND_URLS.split(',').map(url => url.trim())
+        : ['http://localhost:5173', 'http://localhost:3000', 'https://zia-tgsix.ondigitalocean.app'];
+
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   },
   namespace: '/messaging',

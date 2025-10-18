@@ -7,7 +7,9 @@ async function bootstrap() {
   
   // Enable CORS for frontend communication
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'https://zia-tgsix.ondigitalocean.app'], // Allow frontend and main backend
+    origin: process.env.FRONTEND_URLS
+      ? process.env.FRONTEND_URLS.split(',').map(url => url.trim())
+      : ['http://localhost:5173', 'http://localhost:3000', 'https://zia-tgsix.ondigitalocean.app'], // Allow frontend and main backend
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
