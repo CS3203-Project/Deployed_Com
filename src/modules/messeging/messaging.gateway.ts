@@ -14,7 +14,7 @@ import { CreateMessageDto } from './dto';
 
 @WebSocketGateway({
   cors: {
-    origin: true,
+    origin: true, // reflect request origin (allows all origins)
     credentials: true,
   },
   namespace: '/messaging',
