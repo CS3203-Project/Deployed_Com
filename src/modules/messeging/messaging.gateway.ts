@@ -18,10 +18,21 @@ import { CreateMessageDto } from './dto';
       // Allowlist of origins - can be set via FRONTEND_URLS env var (comma-separated)
       const allowedOrigins = process.env.FRONTEND_URLS
         ? process.env.FRONTEND_URLS.split(',').map(url => url.trim())
-        : ['http://localhost:5173', 'http://localhost:3000', 'https://zia-tgsix.ondigitalocean.app'];
+        : [
+            'http://localhost:5173', 
+            'http://localhost:3000', 
+            'https://zia-tgsix.ondigitalocean.app',
+            'https://zia-frontend-ll7ny.ondigitalocean.app',
+            'https://zia-backend-ll7ny.ondigitalocean.app'
+          ];
 
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
+
+      // Allow all *.ondigitalocean.app domains
+      if (origin.endsWith('.ondigitalocean.app')) {
+        return callback(null, true);
+      }
 
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
